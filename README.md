@@ -14,7 +14,7 @@ This tool is designed to assist researchers in understanding the biodiversity, s
 
 ## Requirements
 - R (version 3.5 or higher recommended).
-- R packages: ape, asbio, picante, vegan, FD, dplyr, tidyr, hillR, funrar, rotl, CommEcol.
+- R packages: ape, asbio, picante, vegan, FD, dplyr, tidyr, hillR, funrar, rotl, CommEcol, betapart, zetadiv
 
 ## Installation
 1. Install R from [CRAN](https://cran.r-project.org).
