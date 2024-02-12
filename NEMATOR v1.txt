@@ -1,0 +1,478 @@
+####################################################################
+NEMATOR BY JEAN TRAP UMR ECO&SOLS MONTPELLIER FRANCE
+Email. jean.trap@ird.fr
+The "README" file include the list of computed metrics and the references
+###################################################################
+#LOAD THE PACKAGES
+require(ape)
+require(asbio)
+require(picante)
+require(vegan)
+require(FD)
+require(dplyr)
+require(tidyr)
+require(hillR)
+require(funrar)
+require(rotl)
+require(CommEcol)
+require(betapart)
+require(zetadiv)
+
+#READ AND CLEAN THE COMMUNITY TABLE
+community <- read.table("tayeb.full.txt", header = TRUE) # The nematode community with sites in rows and taxa in column, the first column corresponding to the site name
+"Taxa" -> colnames(community)[1] # Correctly rename the first column
+community <- community[, c(TRUE, colSums(community[,-1]) != 0)] # Remove columns with sum of 0
+community <- community[rowSums(community[,-1]) != 0, ] # Remove rows with sum of 0
+Taxa <- community[, 1, drop = FALSE]
+sorted_community <- sort(colnames(community)[-1]) # Sort columns alphabetically
+community <- cbind(Taxa, community[, sorted_community])
+
+#READ NEMAFFILIATION AND CHECK MISSING TAXA
+nemaffiliation <- read.table("nemaffiliation.txt", header = TRUE) # The nematode affilitation database with trophic group (diet), life groups and mass metrics
+community_tr <- t(community) #Transpose the data
+colnames(community_tr) <- community_tr[1, ] # Set first row as column names
+community_tr <- community_tr[-1, ] # Remove first row now that it's column names
+community_df <- as.data.frame(community_tr, stringsAsFactors = FALSE)  # Convert to data frame
+or_row_names <- rownames(community_df) # Store rownames
+community_df <- data.frame(lapply(community_df, as.numeric))  # Ensure all data is numerical
+rownames(community_df) <- or_row_names
+community_df <- cbind(Taxa = rownames(community_df), community_df)
+print(taxa_missing <- setdiff(community_df$Taxa, nemaffiliation$Taxa)) # If some taxa are listed below, please update nemaffiliation database from scientific papers or compendium
+
+#COMBINE TAXA BETWEEN COMMUNITY AND NEMAFFILIATION
+nemaffiliation$Taxa -> rownames(nemaffiliation)
+nema_all <- merge(nemaffiliation, community_df, by = "Taxa") # Inner join to combine data for taxa present in both data frames
+nema_all <- nema_all[order(nema_all$Taxa),] # Optional: sorting the combined data frame by Taxa for easier readability
+
+#SUBSETTING THE DATA BASED ON DIET & LIFE GROUPS
+# This filtering will be useful to compute the indice and diversity metrics
+filter(nema_all, diet == "B") -> B_comm
+filter(nema_all, diet == "F") -> F_comm
+filter(nema_all, diet == "P") -> P_comm
+filter(nema_all, diet == "O") -> O_comm
+filter(nema_all, diet == "H") -> H_comm
+filter(nema_all, diet.dt == "SE") -> SE_comm
+filter(nema_all, diet.dt == "ME") -> ME_comm
+filter(nema_all, diet.dt == "SM") -> SM_comm
+filter(nema_all, diet.dt == "EC") -> EC_comm
+filter(nema_all, diet.dt == "RA") -> RA_comm
+filter(nema_all, diet != "H") -> FL_comm
+filter(nema_all, life == "cp1") -> cp1
+filter(nema_all, life == "cp2") -> cp2
+filter(nema_all, life == "cp3") -> cp3
+filter(nema_all, life == "cp4") -> cp4
+filter(nema_all, life == "cp5") -> cp5
+filter(nema_all, life == "pp2") -> pp2
+filter(nema_all, life == "pp3") -> pp3
+filter(nema_all, life == "pp4") -> pp4
+filter(nema_all, life == "pp5") -> pp5
+
+#ALPHA ABUNDANCES
+# The code compute the abundance for each trophic group and life group
+data.frame(colSums(community_df[,-1])) -> Ab.tot
+data.frame(colSums(B_comm[,-(1:12)])) -> B.ab.tot
+data.frame(colSums(F_comm[,-(1:12)])) -> F.ab.tot
+data.frame(colSums(P_comm[,-(1:12)])) -> P.ab.tot
+data.frame(colSums(O_comm[,-(1:12)])) -> O.ab.tot
+data.frame(colSums(H_comm[,-(1:12)])) -> H.ab.tot
+data.frame(colSums(SE_comm[,-(1:12)])) -> SE.ab.tot
+data.frame(colSums(ME_comm[,-(1:12)])) -> ME.ab.tot
+data.frame(colSums(SM_comm[,-(1:12)])) -> SM.ab.tot
+data.frame(colSums(EC_comm[,-(1:12)])) -> EC.ab.tot
+data.frame(colSums(RA_comm[,-(1:12)])) -> RA.ab.tot
+data.frame(colSums(cp1[,-(1:12)])) -> cp1.ab.tot
+data.frame(colSums(cp2[,-(1:12)])) -> cp2.ab.tot
+data.frame(colSums(cp3[,-(1:12)])) -> cp3.ab.tot
+data.frame(colSums(cp4[,-(1:12)])) -> cp4.ab.tot
+data.frame(colSums(cp5[,-(1:12)])) -> cp5.ab.tot
+data.frame(colSums(pp2[,-(1:12)])) -> pp2.ab.tot
+data.frame(colSums(pp3[,-(1:12)])) -> pp3.ab.tot
+data.frame(colSums(pp4[,-(1:12)])) -> pp4.ab.tot
+data.frame(colSums(pp5[,-(1:12)])) -> pp5.ab.tot
+colnames(Ab.tot)[1] <- "Ab.tot"
+colnames(B.ab.tot)[1] <- "B.ab.tot"
+colnames(F.ab.tot)[1] <- "F.ab.tot"
+colnames(P.ab.tot)[1] <- "P.ab.tot"
+colnames(O.ab.tot)[1] <- "O.ab.tot"
+colnames(H.ab.tot)[1] <- "H.ab.tot"
+colnames(SE.ab.tot)[1] <- "SE.ab.tot"
+colnames(ME.ab.tot)[1] <- "ME.ab.tot"
+colnames(SM.ab.tot)[1] <- "SM.ab.tot"
+colnames(EC.ab.tot)[1] <- "EC.ab.tot"
+colnames(RA.ab.tot)[1] <- "RA.ab.tot"
+colnames(cp1.ab.tot)[1] <- "cp1.ab.tot"
+colnames(cp2.ab.tot)[1] <- "cp2.ab.tot"
+colnames(cp3.ab.tot)[1] <- "cp3.ab.tot"
+colnames(cp4.ab.tot)[1] <- "cp4.ab.tot"
+colnames(cp5.ab.tot)[1] <- "cp5.ab.tot"
+colnames(pp2.ab.tot)[1] <- "pp2.ab.tot"
+colnames(pp3.ab.tot)[1] <- "pp3.ab.tot"
+colnames(pp4.ab.tot)[1] <- "pp4.ab.tot"
+colnames(pp5.ab.tot)[1] <- "pp5.ab.tot"
+B.ab.tot*100/Ab.tot -> B.ab.rel
+F.ab.tot*100/Ab.tot -> F.ab.rel
+P.ab.tot*100/Ab.tot -> P.ab.rel
+O.ab.tot*100/Ab.tot -> O.ab.rel
+H.ab.tot*100/Ab.tot -> H.ab.rel
+SE.ab.tot*100/H.ab.tot -> SE.ab.rel
+ME.ab.tot*100/H.ab.tot -> ME.ab.rel
+SM.ab.tot*100/H.ab.tot -> SM.ab.rel
+EC.ab.tot*100/H.ab.tot -> EC.ab.rel
+RA.ab.tot*100/H.ab.tot -> RA.ab.rel
+colnames(B.ab.rel)[1] <- "B.ab.rel"
+colnames(F.ab.rel)[1] <- "F.ab.rel"
+colnames(P.ab.rel)[1] <- "P.ab.rel"
+colnames(O.ab.rel)[1] <- "O.ab.rel"
+colnames(H.ab.rel)[1] <- "H.ab.rel"
+colnames(SE.ab.rel)[1] <- "SE.ab.rel"
+colnames(ME.ab.rel)[1] <- "ME.ab.rel"
+colnames(SM.ab.rel)[1] <- "SM.ab.rel"
+colnames(EC.ab.rel)[1] <- "EC.ab.rel"
+colnames(RA.ab.rel)[1] <- "RA.ab.rel"
+
+# Store the abundance values in a vector
+Abundances <- cbind(Ab.tot,
+		B.ab.tot,
+		F.ab.tot,
+		P.ab.tot,
+		O.ab.tot,
+		H.ab.tot,	
+		SE.ab.tot,
+		ME.ab.tot,
+		SM.ab.tot,
+		EC.ab.tot,
+		RA.ab.tot,
+		B.ab.rel,
+		F.ab.rel,
+		P.ab.rel,
+		O.ab.rel,
+		H.ab.rel,
+		SE.ab.rel,
+		ME.ab.rel,
+		SM.ab.rel,
+		EC.ab.rel,
+		RA.ab.rel,
+		cp1.ab.tot,
+		cp2.ab.tot,
+		cp3.ab.tot,
+		cp4.ab.tot,
+		cp5.ab.tot,	
+		pp2.ab.tot,
+		pp3.ab.tot,
+		pp4.ab.tot,
+		pp5.ab.tot)
+
+#ALPHA TAXONOMIC DIVERSITY 
+data.frame(alpha.div(community[,-1], index = "shan")) -> Shannon # Compute the Shannon using asbio package
+colnames(Shannon)[1] <- "Shannon"
+data.frame(alpha.div(community[,-1], index = "simp")) -> Simpson # optional, the inverse Simpson's can be computed using index = "inv.simp"
+colnames(Simpson)[1] <- "Simpson"
+data.frame(Shannon/log(specnumber(community[,-1]))) -> J # Compute the Pielou's Evenness Index coded J
+colnames(J)[1] <- "J"
+
+# Compute the Hill numbers 
+data.frame(hill_taxa(community[,-1], q = 0)) -> q0.all
+data.frame(hill_taxa(community[,-1], q = 1)) -> q1.all
+data.frame(hill_taxa(community[,-1], q = 2)) -> q2.all
+colnames(q0.all)[1] <- "q0.all"
+colnames(q1.all)[1] <- "q1.all"
+colnames(q2.all)[1] <- "q2.all"
+t_generic <- function(df) #Shape diet data frames
+  {df_t <- as.data.frame(t(df[, -(2:12)]))
+  df_t <- df_t[-1,]
+  df_t <- data.frame(lapply(df_t, function(x) as.numeric(as.character(x))))
+  return(df_t)
+}
+
+# Compute the Hill nubmers for each trophic group
+B_comm.t <- t_generic(B_comm)
+data.frame(hill_taxa(B_comm.t, q = 0)) -> q0.B
+colnames(q0.B)[1] <- "q0.B"
+data.frame(hill_taxa(B_comm.t, q = 1)) -> q1.B
+colnames(q1.B)[1] <- "q1.B"
+data.frame(hill_taxa(B_comm.t, q = 2)) -> q2.B
+colnames(q2.B)[1] <- "q2.B"
+F_comm.t <- t_generic(F_comm)
+data.frame(hill_taxa(F_comm.t, q = 0)) -> q0.F
+colnames(q0.F)[1] <- "q0.F"
+data.frame(hill_taxa(F_comm.t, q = 1)) -> q1.F
+colnames(q1.F)[1] <- "q1.F"
+data.frame(hill_taxa(F_comm.t, q = 2)) -> q2.F
+colnames(q2.F)[1] <- "q2.F"
+P_comm.t <- t_generic(P_comm)
+data.frame(hill_taxa(P_comm.t, q = 0)) -> q0.P
+colnames(q0.P)[1] <- "q0.P"
+data.frame(hill_taxa(P_comm.t, q = 1)) -> q1.P
+colnames(q1.P)[1] <- "q1.P"
+data.frame(hill_taxa(P_comm.t, q = 2)) -> q2.P
+colnames(q2.P)[1] <- "q2.P"
+O_comm.t <- t_generic(O_comm)
+data.frame(hill_taxa(O_comm.t, q = 0)) -> q0.O
+colnames(q0.O)[1] <- "q0.O"
+data.frame(hill_taxa(O_comm.t, q = 1)) -> q1.O
+colnames(q1.O)[1] <- "q1.O"
+data.frame(hill_taxa(O_comm.t, q = 2)) -> q2.O
+colnames(q2.O)[1] <- "q2.O"
+H_comm.t <- t_generic(H_comm)
+data.frame(hill_taxa(H_comm.t, q = 0)) -> q0.H
+colnames(q0.H)[1] <- "q0.H"
+data.frame(hill_taxa(H_comm.t, q = 1)) -> q1.H
+colnames(q1.H)[1] <- "q1.H"
+data.frame(hill_taxa(H_comm.t, q = 2)) -> q2.H
+colnames(q2.H)[1] <- "q2.H"
+FL_comm.t <- t_generic(FL_comm)
+data.frame(hill_taxa(FL_comm.t, q = 0)) -> q0.FL
+colnames(q0.FL)[1] <- "q0.FL"
+data.frame(hill_taxa(FL_comm.t, q = 1)) -> q1.FL
+colnames(q1.FL)[1] <- "q1.FL"
+data.frame(hill_taxa(FL_comm.t, q = 2)) -> q2.FL
+colnames(q2.FL)[1] <- "q2.FL"
+
+# Gather all alpha taxonmic metrics in a vector called Alpha.div
+Alpha.div <- cbind(Shannon, Simpson, J, q0.all, q1.all, q2.all, q0.B, q1.B, q2.B, q0.F, q1.F, q2.F, q0.P, q1.P, q2.P, q0.O, q1.O, q2.O, q0.H, q1.H, q2.H, q0.FL, q1.FL, q2.FL)
+
+#NEMATOFAUNAL INDICES (NCR, MI, MI2-5, PPI, EI, SI) AND MASS-BASED METRICS
+#See Read me for the references for each metric
+#COMPUTE PARTICULAR FUNCTIONAL GUILDS
+ba1.taxa <- filter(B_comm, life == "cp1")
+ba2.taxa <- filter(B_comm, life == "cp2")
+fu2.taxa <- filter(F_comm, life == "cp2")
+wthcp1 <- filter(FL_comm, life != "cp1")
+bind_rows(ba1.taxa,fu2.taxa) -> ba1fu2
+data.matrix(ba1fu2) -> ba1fu2.mat
+data.frame(c(crossprod(ba1fu2.mat[,-(1:12)], ba1fu2.mat[,2]))) -> enrichment.fauna
+colnames(enrichment.fauna)[1] <- "e.f."
+bind_rows(ba2.taxa,fu2.taxa) -> ba2fu2
+data.matrix(ba2fu2) -> ba2fu2.mat
+data.frame(c(crossprod(ba2fu2.mat[,-(1:12)], ba2fu2.mat[,2]))) -> basal.fauna
+colnames(basal.fauna)[1] <- "b.f."
+bind_rows(cp3,cp4) -> cp34
+bind_rows(cp34,cp5) -> cp345
+data.matrix(cp345) -> cp345.mat
+data.frame(c(crossprod(cp345.mat[,-(1:12)], cp345.mat[,2]))) -> structure.fauna
+colnames(structure.fauna)[1] <- "s.f."
+data.matrix(FL_comm) -> FL.comm.mat
+data.matrix(wthcp1) -> wthcp1.mat
+data.matrix(H_comm) -> H.comm.mat
+data.matrix(nema_all) -> nema.all.mat
+NCR <- B.ab.tot/(B.ab.tot+F.ab.tot) # Nematode Channel Ratio
+colnames(NCR)[1] <- "NCR"
+data.frame(c(crossprod(FL.comm.mat[,-(1:12)], FL.comm.mat[,6])) / colSums(FL.comm.mat[,-(1:12)])) -> MI
+colnames(MI)[1] <- "MI"
+data.frame(c(crossprod(wthcp1.mat[,-(1:12)], wthcp1.mat[,6])) / colSums(wthcp1.mat[,-(1:12)])) -> MI25
+colnames(MI25)[1] <- "MI25"
+data.frame(c(crossprod(H.comm.mat[,-(1:12)], H.comm.mat[,7])) / colSums(H.comm.mat[,-(1:12)])) -> PPI
+colnames(PPI)[1] <- "PPI"
+PPIMI <- PPI/MI
+colnames(PPIMI)[1] <- "PPI:MI"
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,8])) / colSums(nema.all.mat[,-(1:12)])) -> Mean.mass
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,9])) / colSums(nema.all.mat[,-(1:12)])) -> Mean.prod
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,10])) / colSums(nema.all.mat[,-(1:12)])) -> Mean.resp
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,12])) / colSums(nema.all.mat[,-(1:12)])) -> Mean.budget
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,11])) / colSums(nema.all.mat[,-(1:12)])) -> Mean.CUE
+colnames(Mean.mass)[1] <- "Mean.mass"
+colnames(Mean.prod)[1] <- "Mean.prod"
+colnames(Mean.resp)[1] <- "Mean.resp"
+colnames(Mean.budget)[1] <- "Mean.budget"
+colnames(Mean.CUE)[1] <- "Mean.CUE"
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,8]))) -> Sum.mass
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,9]))) -> Sum.prod
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,10]))) -> Sum.resp
+data.frame(c(crossprod(nema.all.mat[,-(1:12)], nema.all.mat[,12]))) -> Sum.budget
+colnames(Sum.mass)[1] <- "Sum.mass"
+colnames(Sum.prod)[1] <- "Sum.prod"
+colnames(Sum.resp)[1] <- "Sum.resp"
+colnames(Sum.budget)[1] <- "Sum.budget"
+BI <- 100*basal.fauna/(enrichment.fauna+basal.fauna+structure.fauna)
+colnames(BI)[1] <- "BI"
+EI <- 100*enrichment.fauna/(enrichment.fauna+basal.fauna)
+colnames(EI)[1] <- "EI"
+SI <- 100*structure.fauna/(structure.fauna+basal.fauna)
+colnames(SI)[1] <- "SI"
+data.frame(c(crossprod(FL.comm.mat[,-(1:12)], FL.comm.mat[,8])) / colSums(FL.comm.mat[,-(1:12)])) -> Mean.mass.FL
+data.frame(c(crossprod(FL.comm.mat[,-(1:12)], FL.comm.mat[,12])) / colSums(FL.comm.mat[,-(1:12)])) -> Mean.budget.FL
+data.frame(c(crossprod(FL.comm.mat[,-(1:12)], FL.comm.mat[,11])) / colSums(FL.comm.mat[,-(1:12)])) -> Mean.CUE.FL
+colnames(Mean.mass.FL)[1] <- "Mean.mass.FL"
+colnames(Mean.budget.FL)[1] <- "Mean.budget.FL"
+colnames(Mean.CUE.FL)[1] <- "Mean.CUE.FL"
+data.frame(c(crossprod(FL.comm.mat[,-(1:12)], FL.comm.mat[,8]))) -> Sum.mass.FL
+data.frame(c(crossprod(FL.comm.mat[,-(1:12)], FL.comm.mat[,12]))) -> Sum.budget.FL
+colnames(Sum.mass.FL)[1] <- "Sum.mass.FL"
+colnames(Sum.budget.FL)[1] <- "Sum.budget.FL"
+data.frame(c(crossprod(ba1fu2.mat[,-(1:12)], ba1fu2.mat[,8])) / colSums(ba1fu2.mat[,-(1:12)])) -> Mean.mass.EI
+data.frame(c(crossprod(ba1fu2.mat[,-(1:12)], ba1fu2.mat[,12])) / colSums(ba1fu2.mat[,-(1:12)])) -> Mean.budget.EI
+colnames(Mean.mass.EI)[1] <- "Mean.mass.EI"
+colnames(Mean.budget.EI)[1] <- "Mean.budget.EI"
+data.frame(c(crossprod(ba1fu2.mat[,-(1:12)], ba1fu2.mat[,8]))) -> Sum.mass.EI
+data.frame(c(crossprod(ba1fu2.mat[,-(1:12)], ba1fu2.mat[,12]))) -> Sum.budget.EI
+colnames(Sum.mass.EI)[1] <- "Sum.mass.EI"
+colnames(Sum.budget.EI)[1] <- "Sum.budget.EI"
+data.frame(c(crossprod(cp345.mat[,-(1:12)], cp345.mat[,8])) / colSums(cp345.mat[,-(1:12)])) -> Mean.mass.SI
+data.frame(c(crossprod(cp345.mat[,-(1:12)], cp345.mat[,12])) / colSums(cp345.mat[,-(1:12)])) -> Mean.budget.SI
+colnames(Mean.mass.SI)[1] <- "Mean.mass.SI"
+colnames(Mean.budget.SI)[1] <- "Mean.budget.SI"
+data.frame(c(crossprod(cp345.mat[,-(1:12)], cp345.mat[,8]))) -> Sum.mass.SI
+data.frame(c(crossprod(cp345.mat[,-(1:12)], cp345.mat[,12]))) -> Sum.budget.SI
+colnames(Sum.mass.SI)[1] <- "Sum.mass.SI"
+colnames(Sum.budget.SI)[1] <- "Sum.budget.SI"
+
+# ALPHA DISTANCE-BASED FUNCTIONAL DIVERSITY & RARITY INDICES (FRic, FEve, FDisp, FDiv, RaoQ, FGR, Ui, Di)
+nema_traits <- data.frame(cbind(nema_all$diet,nema_all$life,nema_all$mass)) # Selection of nematode traits
+colnames(nema_traits) <- c("diet","life","mass") # Rename the columns
+nema_traits$diet = as.factor(nema_traits$diet) # Convert in factor 
+nema_traits$life = as.factor(nema_traits$life) #Convert in factor
+nema_traits$mass = as.numeric(as.factor(nema_traits$mass)) # Convert in numeric
+rownames(nema_traits) <- nema_all$Taxa
+dbFD(nema_traits, community[,-1], w.abun = TRUE, calc.FGR = TRUE) -> dbFD_nem # The user can set different options, see the Help page of the function 
+data.frame(FRic = dbFD_nem$FRic) -> FRic
+data.frame(FEve = dbFD_nem$FEve) -> FEve
+data.frame(FDisp = dbFD_nem$FDis) -> FDisp
+data.frame(FDiv = dbFD_nem$FDiv) -> FDiv
+data.frame(RaoQ = dbFD_nem$RaoQ) -> RaoQ
+data.frame(FGR = dbFD_nem$FGR) -> FGR
+data.frame(CWM.mass = dbFD_nem$CWM$mass) -> CWM.mass
+nematode_matrix = as.matrix(community[,-1])
+rel_abd <- decostand(nematode_matrix, "total", 1)
+dist_matrix_nem <- compute_dist_matrix(nema_traits, metric = "gower", center = FALSE, scale = FALSE)
+funrar(rel_abd, dist_matrix_nem, rel_abund = TRUE) -> funrar_nem #Compute functional rarity indices
+left_join(funrar_nem$Ui, funrar_nem$Ri, by ="species") -> UiRi
+distinctiveness(rel_abd, dist_matrix_nem, relative = TRUE) -> Di.F
+colnames(Di.F) <- paste("Di-", colnames(Di.F))
+
+# COMPUTE FAITH'S PHYLOGENIC DIVERSITY  
+community_df$Taxa <- tolower(community_df$Taxa)
+taxon_search <- tnrs_match_names(unique(community_df$Taxa), context="Nematodes")
+# Do you have problematic taxa with particular flag? Identify problematic taxa based on specific flags ("barren", "merged", "extinct", "incertae_sedis")
+problematic_taxa_names <- taxon_search$search_string[grepl("barren|merged|extinct|incertae_sedis", taxon_search[,7])]
+print(problematic_taxa_names)
+
+# if No
+tree.nem <- tol_induced_subtree(ott_ids = taxon_search$ott_id)
+tree.nem$tip.label <- strip_ott_ids(tree.nem$tip.label)
+comp.nem <- compute.brlen(multi2di(tree.nem), method = "Grafen",power=1)
+PD <- picante::pd(community[,-1], comp.nem, include.root=F) # Calculate the sum of the total phylogenetic branch length for each sample
+
+# if Yes, two options
+# Option 1. Remove problematic taxa from community_df and proceed with phylogenetic analysis on the cleaned community_df
+if(length(problematic_taxa_names) > 0) {
+  print(paste("Removing problematic taxa:", paste(problematic_taxa_names, collapse = ", ")))
+  
+  community_df <- community_df[!tolower(community_df$Taxa) %in% problematic_taxa_names, ]
+}
+tree.nem <- tol_induced_subtree(ott_ids = taxon_search$ott_id[!taxon_search$search_string %in% problematic_taxa_names])
+tree.nem$tip.label <- strip_ott_ids(tree.nem$tip.label)
+comp.nem <- compute.brlen(multi2di(tree.nem), method = "Grafen",power=1)
+PD <- picante::pd(community[,-1], comp.nem, include.root=F)
+
+# Option 2. Manual correction. 
+# Before removing these taxa, Verify and update taxonomic names using databases (e.g., NCBI Taxonomy, GBIF, ITIS). Updating to the correct or more widely recognized taxonomic identifier might resolve the issue.
+# It is also possible to assign to higher taxonomic level if specific taxa are problematic but closely related taxa are present in OTL
+
+# BETA TAXONOMIC DIVERSITY
+# Useful function to transform distance matrix in long format
+dist.to.tab <- function(mat.dist,vec_nom_sites) {
+  if (class(mat.dist) != "dist") stop("Mauvais format 'mat.dist'")
+  A <- attr(mat.dist, "Size")
+  if( A != length(vec_nom_sites) ) stop("Dimensions différentes 'mat.dist' et 'vec_nom_sites'")
+  B <- vec_nom_sites
+  if (isTRUE(attr(mat.dist, "Diag"))) attr(mat.dist, "Diag") <- FALSE
+  if (isTRUE(attr(mat.dist, "Upper"))) attr(mat.dist, "Upper") <- FALSE
+  data.frame(
+    SiteA = B[unlist(lapply(sequence(A)[-1], function(x) x:A))],
+    SiteB = rep(B[-length(B)], (length(B)-1):1),
+    Dist_SitesA_B = as.vector(mat.dist))
+}
+
+Beta_TD <- dis.chao(community[,-1], index="sorensen", freq=NULL) # Compute dissimilarity indices proposed by Chao et al. (2005) that takes into account rare shared species
+dist.to.tab(mat.dist = Beta_TD, vec_nom_sites = community[,1]) -> Beta_TD.c
+names(Beta_TD.c) <- c("SiteA", "SiteB","BetaTD")
+
+# COMPUTE TAXONOMIC BETA-DIVERSITY TURNOVER & NESTEDNESS
+community.pa <- community[,-1]
+community.pa[community.pa!="0"] <-1 # Convert abundances in binary data
+rownames(community.pa) <- community$Taxa
+bin <- beta.pair(community.pa) # Compute incidence-based pair-wise dissimilarities including turnover and nestedness
+dist.to.tab(mat.dist = bin$beta.sim, vec_nom_sites = community[,1]) -> Beta.Turnover
+names(Beta.Turnover) <- c("SiteA", "SiteB", "Turnover")
+dist.to.tab(mat.dist = bin$beta.sne, vec_nom_sites = community[,1]) -> Beta.Nestedness
+names(Beta.Nestedness) <- c("SiteA", "SiteB", "Nestedness")
+BetaTD.nem <- cbind(Beta_TD.c,Beta.Turnover$Turnover,Beta.Nestedness$Nestedness)
+colnames(BetaTD.nem) <- c("SiteA","SiteB","Sorensen","Turnover","Nestedness")
+
+# BETA FUNCTIONAL DIVERSITY
+d1 = as.dist(dist_matrix_nem)
+h_nem = hclust(d1, method = "average")
+vegan::treedist(data.frame(community[,-1]), h_nem) -> Beta_FD # The total branch length in a trait dendrogram connecting all species, but excluding the unnecessary root segments of the tree
+dist.to.tab(mat.dist = Beta_FD, vec_nom_sites = community[,1]) -> Beta_FD.c
+names(Beta_FD.c) <- c("SiteA", "SiteB","BetaFD")
+
+# BETA PHYLOGENETIC DIVERSITY
+prunedTreeTD <- prune.sample(community[,-1], comp.nem)
+phylosor(community[,-1], prunedTreeTD) -> Beta_PD # Phylogenetic index of beta-diversity PhyloSor corresponding to the fraction of branch-length shared between two communities
+dist.to.tab(mat.dist = Beta_PD, vec_nom_sites = community[,1]) -> Beta_PD.c
+names(Beta_PD.c) <- c("SiteA", "SiteB","BetaPD")
+
+# ZETA DIVERSITY
+community.oc <- community[,-1]
+community.oc[community.oc!="0"] <-1 #convert abundances in binary data
+zeta.nem <- Zeta.decline.mc(community.oc, orders = 1:10, sam = 100) # 
+data.frame(zeta.nem$zeta.order) -> zeta.order
+data.frame(zeta.nem$zeta.val) -> zeta.value
+zeta <- cbind(zeta.order,zeta.value)
+colnames(zeta) <- c("order","zeta.value")
+
+#BIND AND EXPORT FOR ALPHA
+nemator.alpha.data <- cbind(Taxa,
+      Abundances,
+      Alpha.div,
+      NCR,
+      MI,
+      MI25,
+      PPI,
+      PPIMI,BI,
+      EI,
+      SI,
+      Mean.mass,
+      Mean.prod,
+      Mean.resp,
+      Mean.budget,
+      Mean.CUE,
+      Sum.mass,
+      Sum.prod,
+      Sum.resp,
+      Sum.budget,
+      Mean.mass.FL,
+      Mean.budget.FL,
+      Mean.CUE.FL,
+      Sum.mass.FL,
+      Sum.budget.FL,
+      Mean.mass.EI,
+      Mean.budget.EI,
+      Sum.mass.EI,
+      Sum.budget.EI,
+      Mean.mass.SI,
+      Mean.budget.SI,
+      Sum.mass.SI,
+      Sum.budget.SI,
+      FRic,
+      FEve,
+      FDisp,
+      FDiv,
+      RaoQ,
+      FGR,
+      CWM.mass,
+      PD,
+      Di.F)
+
+write.table(data.frame(nemator.alpha.data), file = "nemator.alpha.data.csv", col.names = TRUE, row.names = FALSE)
+write.table(data.frame(UiRi), file = "UiRi.csv", col.names = TRUE, row.names = FALSE)
+
+#BIND AND EXPORT FOR BETA AND ZETA
+cbind(BetaTD.nem,Beta_FD.c$BetaFD,Beta_PD.c$BetaPD) -> Beta_join
+colnames(Beta_join) <- c("Site A", "Site B", "BetaTD", "BetaFD", "BetaPD")
+write.table(data.frame(Beta_join), file = "nemator.beta.data.csv", col.names = TRUE, row.names = FALSE)
+write.table(data.frame(zeta), file = "nemator.zeta.data.csv", col.names = TRUE, row.names = FALSE)
+
+
+
+
